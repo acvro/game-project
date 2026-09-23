@@ -4,6 +4,55 @@
 #include <vector>
 #include <cctype>
 #include <limits>
+#include <thread>
+#include <chrono>
+#include <streambuf>
+
+namespace ansi {
+
+    // Reset
+    constexpr const char* reset = "\033[0m\033[48;2;25;15;45m";
+
+    // Text styles
+    constexpr const char* bold      = "\033[1m";
+    constexpr const char* dim       = "\033[2m";
+    constexpr const char* italic    = "\033[3m";
+    constexpr const char* underline = "\033[4m";
+    constexpr const char* blink     = "\033[5m";
+    constexpr const char* reverse   = "\033[7m";
+    constexpr const char* hidden    = "\033[8m";
+
+    // Standard foreground colors
+    constexpr const char* black   = "\033[48;2;25;15;45m\033[30m";
+    constexpr const char* red     = "\033[48;2;25;15;45m\033[31m";
+    constexpr const char* green   = "\033[48;2;25;15;45m\033[32m";
+    constexpr const char* yellow  = "\033[48;2;25;15;45m\033[33m";
+    constexpr const char* blue    = "\033[48;2;25;15;45m\033[34m";
+    constexpr const char* magenta = "\033[48;2;25;15;45m\033[35m";
+    constexpr const char* cyan    = "\033[48;2;25;15;45m\033[36m";
+    constexpr const char* white   = "\033[48;2;25;15;45m\033[37m";
+
+    // Bright foreground colors
+    constexpr const char* gray          = "\033[48;2;25;15;45m\033[90m";
+    constexpr const char* brightRed     = "\033[48;2;25;15;45m\033[91m";
+    constexpr const char* brightGreen   = "\033[48;2;25;15;45m\033[92m";
+    constexpr const char* brightYellow  = "\033[48;2;25;15;45m\033[93m";
+    constexpr const char* brightBlue    = "\033[48;2;25;15;45m\033[94m";
+    constexpr const char* brightMagenta = "\033[48;2;25;15;45m\033[95m";
+    constexpr const char* brightCyan    = "\033[48;2;25;15;45m\033[96m";
+    constexpr const char* brightWhite   = "\033[48;2;25;15;45m\033[97m";
+
+    // Cursor / screen controls
+    constexpr const char* clearScreen =
+    "\033[2J"
+    "\033[3J"
+    "\033[48;2;25;15;45m"
+    "\033[H";
+    constexpr const char* clearLine   = "\033[2K";
+    constexpr const char* hideCursor  = "\033[?25l";
+    constexpr const char* showCursor  = "\033[?25h";
+}
+
 
 class Player {
 private:
@@ -52,6 +101,7 @@ public:
     void UpgradeDamage(int amount);
     void UpgradeSpeed(int amount);
     void UpgradeDefense(int amount);
+    void ResetHealth();
 
     bool IsDead() const;
 
@@ -62,6 +112,7 @@ public:
     int GetEP() const;
     int GetDamage() const;
     int GetLevel() const;
+    int GetXPForLevel() const;
 };
 
 
@@ -219,6 +270,10 @@ void Player::UpgradeDefense(int amount) {
     defense += amount;
 }
 
+void Player::ResetHealth() {
+    hp = maxHp;
+}
+
 
 bool Player::IsDead() const {
     return hp == 0;
@@ -231,7 +286,7 @@ std::string Player::GetStats() const {
 ==============================
 
 HP: {}
-XP: {}
+XP: {} / {}
 Evo Points: {}
 Level: {}
 
@@ -244,6 +299,7 @@ Speed: {}
 Damage: {})",
         hp,
         xp,
+        GetXPForLevel(),
         ep,
         level,
         defense,
@@ -274,6 +330,10 @@ int Player::GetDamage() const {
 
 int Player::GetLevel() const {
     return level;
+}
+
+int Player::GetXPForLevel() const {
+    return XPForLevel(level + 1);
 }
 
 
@@ -396,7 +456,7 @@ public:
         : playerName(playerName) {
 
         enemies.emplace_back(
-            "Slime",
+            "Pirate",
             50,
             10,
             5,
@@ -405,7 +465,7 @@ public:
         );
 
         enemies.emplace_back(
-            "Goblin",
+            "Skeleton",
             75,
             20,
             15,
@@ -462,34 +522,57 @@ public:
 // ==============================
 
 void Game::ShowMainMenu() {
+    std::cout << ansi::clearScreen;
     std::cout << std::format(R"(
 
-=================================
-||         EVOLUTION          ||
-=================================
+{}Welcome,{} {}{}!{}
 
-Welcome, {}!
+{}[fight] <- Fight{}
+{}[stats] <- View Stats{}
+{}[quit] <- Quit{}
+{}[menu] <- View Menu{}
 
-[fight]  Fight
-[stats]  View Stats
-[quit]   Quit
-[menu]   View Menu
+> )",   ansi::brightCyan, ansi::reset,
 
-> )", playerName);
+        ansi::brightYellow,
+            playerName,
+        ansi::reset,
+
+        ansi::brightCyan, ansi::reset,
+
+        ansi::brightYellow, ansi::reset,
+
+        ansi::brightRed, ansi::reset,
+
+        ansi::brightCyan, ansi::reset
+    );
 }
 
 
 Enemy& Game::ShowFightMenu() {
+    std::cout << ansi::clearScreen;
 
-    std::cout << R"(
+    std::cout << ansi::brightRed << std::format(R"(
+╔══════════════════════════════════════════════════════════════════════╗
+║                ███████╗██╗ ██████╗ ██╗  ██╗████████╗                 ║
+║                ██╔════╝██║██╔════╝ ██║  ██║╚══██╔══╝                 ║
+║                █████╗  ██║██║  ███╗███████║   ██║                    ║
+║                ██╔══╝  ██║██║   ██║██╔══██║   ██║                    ║
+║                ██║     ██║╚██████╔╝██║  ██║   ██║                    ║
+║                ╚═╝     ╚═╝ ╚═════╝ ╚═╝  ╚═╝   ╚═╝                    ║
+╚══════════════════════════════════════════════════════════════════════╝
+    )") << ansi:reset;
 
-===========================
-||        FIGHT!         ||
-===========================
+    Wait(1000);
 
-Choose your enemy:
+    std::cout << std::format(R"(
+{}
+Choose your enemy:{}
 
-)";
+)", ansi::brightMagenta, ansi::reset
+    );
+
+    Wait(250);
 
     int index = 1;
 
@@ -501,7 +584,7 @@ Choose your enemy:
             << enemy.GetName();
 
         if (player.GetLevel() < enemy.GetRequiredLevel())
-            std::cout << " [LOCKED]";
+            std::cout << ansi::gray << " [LOCKED]" << ansi::reset;
 
         std::cout << '\n';
 
@@ -524,7 +607,7 @@ Choose your enemy:
                 '\n'
             );
 
-            std::cout << "Please enter a number.\n";
+            std::cout << ansi::brightRed << "Please enter a number.\n" << ansi::reset;
 
             continue;
         }
@@ -548,12 +631,12 @@ Choose your enemy:
 
 
             std::cout
-                << "That enemy is locked.\n";
+                << ansi::brightYellow << "That enemy is locked.\n" << ansi::reset;
 
         } else {
 
             std::cout
-                << "Invalid choice.\n";
+                << ansi::brightRed << "Invalid choice.\n" << ansi::reset;
         }
     }
 }
@@ -562,6 +645,7 @@ Choose your enemy:
 void Game::Fight(Enemy& enemy) {
 
     enemy.ResetHealth();
+    player.ResetHealth();
 
     std::cin.ignore(
         std::numeric_limits<std::streamsize>::max(),
@@ -569,32 +653,64 @@ void Game::Fight(Enemy& enemy) {
     );
 
     std::string action;
-
+    std::cout << ansi::clearScreen;
 
     while (
         !player.IsDead() &&
         !enemy.IsDead()
     ) {
+std::cout << ansi::clearScreen;
 
-        std::cout << std::format(R"(
+std::cout << std::format(R"(
 
-========================
-{} vs {}
-========================
+{}========================
+||{}  {}{}{} {}vs{} {}{}{}  {}||
+========================{}
 
-Your HP : {}
-Enemy HP: {}
+{}Your HP  {}: {}{}{}
+{}Enemy HP {}: {}{}{}
 
-[att] <- Attack
-[esc] <- Escape from fight
+{}{}[a] <- Attack{}
+{}{}[esc] <- Escape{}
 
 > )",
-            playerName,
-            enemy.GetName(),
-            player.GetHP(),
-            enemy.GetHP());
+    ansi::brightYellow,
+    ansi::reset,
 
+    ansi::brightCyan,
+    playerName,
+    ansi::reset,
 
+    ansi::brightWhite,
+    ansi::reset,
+
+    ansi::brightYellow,
+    enemy.GetName(),
+    ansi::reset,
+
+    ansi::brightYellow,
+    ansi::reset,
+
+    ansi::brightCyan,
+    ansi::brightCyan,
+    player.GetHP(),
+    ansi::reset,
+    ansi::brightMagenta,
+    ansi::reset,
+
+    ansi::brightCyan,
+    ansi::brightCyan,
+    enemy.GetHP(),
+    ansi::reset,
+    ansi::brightMagenta,
+    ansi::reset,
+
+    ansi::brightGreen,
+    ansi::reset,
+
+    ansi::brightRed,
+    ansi::reset
+);
         std::getline(
             std::cin,
             action
@@ -623,23 +739,33 @@ Enemy HP: {}
             int epLoss =
                 player.GetEP() / 10;
 
-
+            std::cout << ansi::clearScreen;
             player.LoseXP(xpLoss);
             player.LoseEP(epLoss);
 
 
             std::cout << std::format(
-                R"(
-You fled the battle!
+    R"(
+{}You fled the battle!{}
 
--{} XP
--{} EP
+{}-{} XP{}
+{}-{} EP{}
 
 )",
-                xpLoss,
-                epLoss
-            );
+    ansi::brightRed,
+    ansi::reset,
 
+    ansi::brightMagenta,
+    xpLoss,
+    ansi::reset,
+
+    ansi::brightMagenta,
+    epLoss,
+    ansi::reset
+);
+            Wait(1500);
+            std::cout << ansi::clearScreen;
+            ShowMainMenu();
 
             return;
         }
@@ -649,10 +775,11 @@ You fled the battle!
         // ATTACK VALIDATION
         // ==============================
 
-        if (action != "att") {
+        if (action != "a") {
 
             std::cout
-                << "Unknown command.\n";
+                << ansi::brightRed << "Unknown command.\n" << ansi::reset;
+            Wait(500);
 
             continue;
         }
@@ -687,8 +814,11 @@ You fled the battle!
 
     if (player.IsDead()) {
 
-        std::cout
-            << "\nYou were defeated.\n";
+        std::cout << ansi::clearScreen;
+        std::cout << ansi::brightRed << "\nYou were defeated.\n" << ansi::reset;
+        Wait(1500);
+
+        ShowMainMenu();
 
     } else {
 
@@ -700,8 +830,8 @@ You fled the battle!
             enemy.GetEPReward()
         );
 
-
-        std::cout << std::format(
+        std::cout << ansi::clearScreen;
+        std::cout << ansi::brightGreen << std::format(
             R"(
 Victory!
 
@@ -711,7 +841,10 @@ Victory!
 )",
             enemy.GetXPReward(),
             enemy.GetEPReward()
-        );
+        ) << ansi::reset;
+        Wait(1500);
+
+        ShowMainMenu();
     }
 }
 
@@ -763,6 +896,7 @@ void Game::Run() {
 
         else if (choice == "stats") {
 
+            std::cout << ansi::clearScreen;
             std::cout
                 << player.GetStats()
                 << '\n';
@@ -786,7 +920,7 @@ void Game::Run() {
         else if (choice == "quit") {
 
             std::cout
-                << "\nThanks for playing!\n";
+                << ansi::brightMagenta << "\nThanks for playing!\n" << ansi::reset;
 
             break;
         }
@@ -799,8 +933,9 @@ void Game::Run() {
         else {
 
             std::cout
-                << "Unknown command. "
-                << "Type [menu] to see the commands.\n";
+                << ansi::brightRed << "Unknown command. " << ansi::reset
+                << ansi::brightCyan << "Type [menu] to see the commands.\n" << ansi::reset;
+            Wait(500);
         }
     }
 }
@@ -811,13 +946,39 @@ void Game::Run() {
 // ==============================
 
 int main() {
+    std::cout << ansi::clearScreen << ansi::clearScreen;
+
+    std::cout << ansi::brightRed << R"(
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║                                                                               ║
+║  █████╗ ███████╗ ██████╗███████╗███╗   ██╗██████╗  █████╗ ███╗   ██╗████████╗ ║
+║ ██╔══██╗██╔════╝██╔════╝██╔════╝████╗  ██║██╔══██╗██╔══██╗████╗  ██║╚══██╔══╝ ║
+║ ███████║███████╗██║     █████╗  ██╔██╗ ██║██║  ██║███████║██╔██╗ ██║   ██║    ║
+║ ██╔══██║╚════██║██║     ██╔══╝  ██║╚██╗██║██║  ██║██╔══██║██║╚██╗██║   ██║    ║
+║ ██║  ██║███████║╚██████╗███████╗██║ ╚████║██████╔╝██║  ██║██║ ╚████║   ██║    ║
+║ ╚═╝  ╚═╝╚══════╝ ╚═════╝╚══════╝╚═╝  ╚═══╝╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═══╝   ╚═╝    ║
+║                                                                               ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
+)" << ansi::reset;
+    
+    Wait(2000);
+
+    std::cout << ansi::brightRed << "\n\nFight. " << std::flush;
+    Wait(1500);
+    std::cout << "Buy. " << std::flush;
+    Wait(1500);
+    std::cout << "Survive. " << ansi::reset << std::flush;  
+    Wait(1500);
+
+    std::cout << ansi::clearScreen;
 
     std::string playerName;
 
 
     std::cout
-        << "Salute, Captain! "
-        << "What should we call you?\n> ";
+        << ansi::brightMagenta << "\nSalute, Captain! "
+        << "What should we call you?\n" << ansi::reset << ansi::brightCyan << "> \a" << ansi::reset;
 
 
     std::getline(
